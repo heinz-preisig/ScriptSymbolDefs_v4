@@ -1,0 +1,2 @@
+\def\qTemp{{\temperature^2}}
+\def\temperature{{T}}

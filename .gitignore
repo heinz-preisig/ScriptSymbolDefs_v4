@@ -1,0 +1,17 @@
+*.class
+*.pyc
+*.pyo
+*.prefs
+.settings
+*.*~
+*.ini
+.idea
+*__pycache__*
+workspace.xml
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.pdf
+*.synctex.gz
+workspace.*

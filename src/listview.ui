@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Dialog</class>
+ <widget class="QDialog" name="Dialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>348</width>
+    <height>604</height>
+   </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
+  <property name="windowTitle">
+   <string>Macro list</string>
+  </property>
+  <property name="toolTip">
+   <string comment="click on item to copy macro into the clipboard" extracomment="click on item to copy macro into the clipboard"/>
+  </property>
+  <property name="whatsThis">
+   <string extracomment="click on item to copy macro into the clipboard"/>
+  </property>
+  <widget class="QListWidget" name="listMacros">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>10</y>
+     <width>321</width>
+     <height>571</height>
+    </rect>
+   </property>
+   <property name="maximumSize">
+    <size>
+     <width>2000</width>
+     <height>2000</height>
+    </size>
+   </property>
+   <property name="sizeIncrement">
+    <size>
+     <width>200</width>
+     <height>200</height>
+    </size>
+   </property>
+   <property name="toolTip">
+    <string comment="click on item to copy macro into the clipboard" extracomment="click on item to copy macro into the clipboard"/>
+   </property>
+   <property name="whatsThis">
+    <string comment="click on item to copy macro into the clipboard" extracomment="click on item to copy macro into the clipboard"/>
+   </property>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
