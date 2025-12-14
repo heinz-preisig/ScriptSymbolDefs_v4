@@ -35,12 +35,12 @@ TEMPLATES['def_vars'] = '%s/defvars.def'
 TEMPLATES['macros']  = '%s/macros.def'
 TEMPLATES['nomenclature_entry'] = '\\NomenclaturEntry{%s}{%s}{%s}{%s}\n'
 #TEMPLATES['common_defs_load'] = '% uses \resourcelocation{defs_math.tex}' #'\\input{\\resourcelocation{defs_math.tex}}\n'
-TEMPLATES['defs_entry'] = '\def\%s{\Var{%s}}\n'
-TEMPLATES['def_macro'] = '\def\%s{{%s}}\n'
+TEMPLATES['defs_entry'] = r'\def\%s{\Var{%s}}\n'
+TEMPLATES['def_macro'] = r'\def\%s{{%s}}\n'
 # _s = '\\newglossaryentry{#1}{type=nomenclature, name={\ensuremath{#2}}, ' \
 #      'description={#3},sort={#4}}'  # hash, name(symbol), description, sort
 #TEMPLATES['glossary_transformer'] = '\\def\\NomenclaturEntry#1#2#3#4{%s}\n' % _s
-TEMPLATES['defs_transformer'] = '\\def\Var#1{\\gls{#1}}'
+TEMPLATES['defs_transformer'] = r'\\def\Var#1{\\gls{#1}}'
 
 
 class UI(QWidget):
@@ -387,7 +387,7 @@ class UI(QWidget):
   def on_comboBoxHash_activated(self, s):
     _s = str(s)
     self.clipboard.clear()
-    self.clipboard.setText('\%s'%_s)
+    self.clipboard.setText(r'\%s'%_s)
 
   def on_lineEditHash_textEdited(self):
     # 		print 'hash modified text', self.ui.lineEditHash.text()

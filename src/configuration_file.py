@@ -50,7 +50,7 @@ class ConfigError(Exception):
 class ConfigFile():
     def __init__(self):
 
-        self.section_pattern = RE.compile('\[\w*.\w*\]')
+        self.section_pattern = RE.compile(r'\[\w*.\w*\]')
         self.token_equal = RE.compile('=')
         self.token_comment = RE.compile('#')
         self.dictionary = OrderedDict()
