@@ -1,0 +1,4 @@
+PyQt6>=6.0.0
+mypy>=0.900
+black>=21.5b2
+pytest>=6.2.4

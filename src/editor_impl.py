@@ -1,433 +1,543 @@
-'''
-Created on Jan 26, 2014
+from pathlib import Path
+from typing import Optional, List
+from PyQt6 import QtCore, QtWidgets
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QMenu, QInputDialog
 
-@author: Preisig, Heinz A
-
-changes : 2015-07-01 Preisig glossary type is now nomenclature
-changes : 2015-09-28 Preisig file name changed to nomenclature
-'''
-
-__author__ = "PREISIG, Heinz A"
-__copyright__ = "Copyright 2015,  H A Preisig"
-__since__ = "2014.01.26"
-__license__ = "generic module"
-__version__ = "0"
-__email__ = "heinz.preisig@chemeng.ntnu.no"
-__status__ = "beta"
-
-import os as OS
-from PyQt5 import QtCore
-
-import directoryhistory.manage_former_directories as SC
-from PyQt5.QtWidgets import QFileDialog, QWidget, QApplication
-
-from directoryhistory.listview_impl import UI_ListView
 from editor import Ui_Form
-
-HOME = OS.environ['HOME']
-CONFIGURATIONDIR = HOME + '/.glossaries/'
-CONFIGURATIONAME = 'symbols'
-
-TEMPLATES = {}
-TEMPLATES['log'] = '%s/nomenclature.log'
-TEMPLATES['nomenclature'] = '%s/nomenclature.def'
-TEMPLATES['def_vars'] = '%s/defvars.def'
-TEMPLATES['macros']  = '%s/macros.def'
-TEMPLATES['nomenclature_entry'] = '\\NomenclaturEntry{%s}{%s}{%s}{%s}\n'
-#TEMPLATES['common_defs_load'] = '% uses \resourcelocation{defs_math.tex}' #'\\input{\\resourcelocation{defs_math.tex}}\n'
-TEMPLATES['defs_entry'] = r'\def\%s{\Var{%s}}\n'
-TEMPLATES['def_macro'] = r'\def\%s{{%s}}\n'
-# _s = '\\newglossaryentry{#1}{type=nomenclature, name={\ensuremath{#2}}, ' \
-#      'description={#3},sort={#4}}'  # hash, name(symbol), description, sort
-#TEMPLATES['glossary_transformer'] = '\\def\\NomenclaturEntry#1#2#3#4{%s}\n' % _s
-TEMPLATES['defs_transformer'] = r'\\def\Var#1{\\gls{#1}}'
+from models import GlossaryManager
+from directory_history import DirectoryHistory
+from listview_impl import UI_ListView
 
 
-class UI(QWidget):
-  '''
-  classdocs
-  '''
-
+class UI(QtWidgets.QWidget):
   def __init__(self):
-    '''
-    Constructor
-    '''
-    QWidget.__init__(self)
+    super().__init__()
     self.ui = Ui_Form()
     self.ui.setupUi(self)
-    self.macro_list = UI_ListView('\\%s')
-    self.setWindowTitle("Macro definition form")
-    self.macro_list.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
-    self.clipboard = QApplication.clipboard()
+    self.glossary: Optional[GlossaryManager] = None
+    self.dir_history = DirectoryHistory("glossary_editor")
+    self._setup_ui()
 
-    self.macro_list.newSelection.connect(self.__selectItemInComboBoxHash)
+  def _setup_ui(self) -> None:
+    """Initialize UI components and connections."""
+    self.setWindowTitle("Glossary Editor")
+    self._new_repository = False
 
-    sel = self.__previousDirsSelector()
+    # Connect buttons
+    self.ui.pushButtonNewRepo.clicked.connect(self._create_new_repository)
+    self.ui.pushButtonLoad.clicked.connect(self.on_load_clicked)
+    self.ui.pushButtonWrite.clicked.connect(self.on_save_clicked)
+    self.ui.pushButtonShowList.clicked.connect(self.on_show_list_clicked)
+    self.ui.pushButtonNew.clicked.connect(self.on_new_clicked)
+    self.ui.pushButtonEdit.clicked.connect(self.on_edit_clicked)
+    self.ui.pushButtonDelete.clicked.connect(self.on_delete_clicked)
+    self.ui.pushButtonCancel.clicked.connect(self.on_cancel_clicked)
+    self.ui.pushButtonAccept.clicked.connect(self.on_accept_clicked)  # Add this line
 
-  def __start(self):
-    s = self.chosen_dir
-    self.ui.labelDirectory.setText(s)  # QtCore.QString(s))
-    self.directory = s
-    self.file_log = TEMPLATES['log'] % s
-    self.file_nomenclature = TEMPLATES['nomenclature'] % s
-    self.file_defvars = TEMPLATES['def_vars'] % s
-    self.file_macros = TEMPLATES['macros'] %s
-    self.modified = False
-    self.populating = False
+    self.ui.comboBoxHash.currentIndexChanged.connect(self.on_entry_selected)
+    self._set_edit_mode(False)
+    self._update_ui_state(False)
 
-    self.gloss_entries = {}
-    self.symbol_list = []
+  def _create_new_repository(self) -> None:
+    """Create a new glossary repository with empty files."""
+    # Ask user to select a directory
+    dir_path = QFileDialog.getExistingDirectory(
+            self,
+            "Select Directory for New Glossary",
+            str(Path.home()),
+            QFileDialog.Option.ShowDirsOnly
+            )
 
-    if OS.path.exists(self.file_nomenclature):
-      self.read_file(s)
-      self.new_file = False
-      self.setMode('choose')
+    if not dir_path:
+      return  # User cancelled
+
+    dir_path = Path(dir_path)
+
+    # Check if glossary files already exist
+    glossary_files = ["nomenclature.tex", "def_vars.tex", "macros.tex"]
+    existing_files = [f for f in glossary_files if (dir_path / f).exists()]
+
+    if existing_files:
+      QMessageBox.warning(
+              self,
+              "Glossary Files Exist",
+              f"The following glossary files already exist:\n{', '.join(existing_files)}\n\n"
+              "Please select a different directory or remove these files."
+              )
+      return
+
+    try:
+      # Create empty glossary files with templates
+      files = {
+              "nomenclature.tex": r"""% Nomenclature entries
+% Format: \nomenclature[<prefix>]{<symbol>}{<description>}
+% Example:
+% \nomenclature[A]{$A$}{Area ($\mathrm{m}^2$)}
+""",
+              "def_vars.tex"    : r"""% Variable definitions
+% Format: \defVar[<unit>]{<name>}{<symbol>}{<description>}
+% Example:
+% \defVar[m^2]{A}{A}{Area}
+""",
+              "macros.tex"      : r"""% Macro definitions
+% Format: \newcommand{\<name>}[<args>]{<definition>}
+% Example:
+% \newcommand{\R}{\mathbb{R}}
+"""
+              }
+
+      # Create directory if it doesn't exist
+      dir_path.mkdir(parents=True, exist_ok=True)
+
+      # Write files
+      for filename, content in files.items():
+        (dir_path / filename).write_text(content)
+
+      # Add to recent directories and load the new repository
+      self.dir_history.add_directory(str(dir_path))
+      self._load_glossary(str(dir_path))
+
+      QMessageBox.information(
+              self,
+              "Success",
+              f"New glossary repository created at {dir_path}"
+              )
+      self._new_repository = True
+      self._set_edit_mode(True)
+
+    except Exception as e:
+      QMessageBox.critical(
+              self,
+              "Error",
+              f"Failed to create glossary: {str(e)}"
+              )
+      self._new_repository = False
+
+  def on_load_clicked(self, dir_path: Optional[str] = None) -> None:
+    """Handle load button click.
+
+    Args:
+        dir_path: Optional directory path to load directly (used for recent directories)
+    """
+    if not dir_path:
+        # Show recent directories in a menu
+        recent_dirs = self.dir_history.get_recent_directories()
+
+        if recent_dirs:
+            menu = QMenu(self)
+
+            # Add recent directories
+            for dir_path in recent_dirs:
+                action = menu.addAction(dir_path)
+                action.triggered.connect(
+                    lambda checked, path=dir_path: self.on_load_clicked(path)
+                )
+
+            # Add option to browse
+            menu.addSeparator()
+            browse_action = menu.addAction("Browse...")
+            browse_action.triggered.connect(self._browse_for_directory)
+
+            # Show the menu at the button position
+            menu.exec(self.ui.pushButtonShowList.mapToGlobal(
+                self.ui.pushButtonShowList.rect().bottomLeft()
+            ))
+            return
+        else:
+            # No recent directories, just browse
+            self._browse_for_directory()
     else:
-      self.new_file = True
-      self.setMode('new')
+        # Directory was provided (from recent directories)
+        self._load_glossary(dir_path)
 
-    self.show()
+  def on_save_clicked(self) -> None:
+    """Handle save button click."""
+    if not self.glossary:
+      QMessageBox.warning(self, "Error", "No glossary is loaded.")
+      return
 
+    # Get the current values from the UI
+    new_hash = self.ui.lineEditHash.text().strip()
+    symbol = self.ui.lineEditSymbol.text().strip()
+    description = self.ui.lineEditDescription.text().strip()
+    sort_key = self.ui.lineEditSortKey.text().strip()
 
-  def __previousDirsSelector(self):
+    # Validate inputs
+    if not all([new_hash, symbol, description, sort_key]):
+      QMessageBox.warning(self, "Error", "All fields are required.")
+      return
+      
+    # Check if this is a new hash and it already exists
+    if hasattr(self, '_original_hash') and new_hash != self._original_hash and new_hash in self.glossary.entries:
+      QMessageBox.warning(self, "Error", f"An entry with hash '{new_hash}' already exists.")
+      self.ui.lineEditHash.setFocus()
+      return
 
-    self.former_directories = SC.selectDirectory(CONFIGURATIONAME,
-                                                 CONFIGURATIONDIR)
-    dirs = self.former_directories.getLastDirectories()
-    self.dir_list = UI_ListView()
-    self.dir_list.setModal(True)
-    self.dir_list.newSelection.connect(self.__gotDirectory)
-    _l = list(dirs.values())
-    self.dir_list.build(_l)
-    # self.dir_list.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
-    self.dir_list.show()
+    # Update the entry in the glossary
+    try:
+      # If the hash name changed, remove the old entry and add a new one
+      if hasattr(self, '_original_hash') and self._original_hash and new_hash != self._original_hash:
+        if self._original_hash in self.glossary.entries:
+          self.glossary.entries[new_hash] = self.glossary.entries.pop(self._original_hash)
+      
+      # Add or update the entry
+      self.glossary.entries[new_hash] = {
+              'symbol'     : symbol,
+              'description': description,
+              'sort_key'   : sort_key
+              }
 
-  def __gotDirectory(self, s):
-    self.got_dir = True
-    _s = str(s)
-    print('chosen dir', _s)
-    selection = self.__askDirectory(_s)
-    if selection != str(_s):
-      self.former_directories.put(selection)
-    self.dir_list.close()
-    self.chosen_dir = selection
-    self.__start()
-
-
-  def __askDirectory(self, default):
-    s = QFileDialog.getExistingDirectory(self, "select directory",
-                                           # "/home/heinz/",
-                                           default,
-                                           QFileDialog.ShowDirsOnly
-                                           | QFileDialog.DontResolveSymlinks);
-    self.chosen_dir = s
-    return s
-
-  @QtCore.pyqtSlot(str)
-  def __selectItemInComboBoxHash(self, selection):
-    index = self.ui.comboBoxHash.findText(selection)
-    self.ui.comboBoxHash.setCurrentIndex(index)
-    self.raise_()
-
-  def read_file(self, s):
-    f_in = TEMPLATES['nomenclature'] % s
-    f_i = open(f_in, 'r')
-
-    for line in f_i:
-      (hash_name, symbol, description, sort) = self.formatParse(line)
-      self.gloss_entries[hash_name] = {}                     # name of the macro
-      self.gloss_entries[hash_name]['symbol'] = symbol          # tex definition
-      self.gloss_entries[hash_name]['description'] = description
-      self.gloss_entries[hash_name]['sort_key'] = sort
-
-      # if ('\def' not in line) :# and ('\input' not in line): # the sort is optional thus two blocks
-      #   try:
-      #     (hash_name, symbol, description) = self.formatParse(line)
-      #     self.gloss_entries[hash_name] = {}
-      #     self.gloss_entries[hash_name]['symbol'] = symbol
-      #     self.gloss_entries[hash_name]['description'] = description
-      #     self.gloss_entries[hash_name]['sort_key'] = symbol
-      #   except:
-      #     try:
-      #       (hash_name, symbol, description, sort) = self.formatParse(line)
-      #     except:
-      #       print
-      #       '>>> error in line: ', line
-      #     self.gloss_entries[hash_name] = {}
-      #     self.gloss_entries[hash_name]['symbol'] = symbol
-      #     self.gloss_entries[hash_name]['description'] = description
-      #     self.gloss_entries[hash_name]['sort_key'] = sort
-
-    if self.gloss_entries.keys() != []:
-      self.populateComboBox()
-      self.on_comboBoxHash_currentIndexChanged(0)
-      self.populateLineEdits()
-      self.setMode('choose')
-
-  def write_files(self):
-    f_gloss = open(self.file_nomenclature, 'w')
-    f_defvars = open(self.file_defvars, 'w')
-    f_macros = open(self.file_macros, 'w')
-    # _s = TEMPLATES['common_defs_load']
-    # f_gloss.write(_s)
-    # _s = TEMPLATES['glossary_transformer']
-    # f_gloss.write(_s)
-    hashes = sorted(self.gloss_entries.keys())
-    # hashes.sort()
-    for hash_name in hashes:  # self.gloss_entries.keys():
-      symbol = self.gloss_entries[hash_name]['symbol']
-      description = self.gloss_entries[hash_name]['description']
-      sort_key = self.gloss_entries[hash_name]['sort_key']
-      _s = TEMPLATES['nomenclature_entry'] % (
-      hash_name, symbol, description, sort_key)
-      f_gloss.write(_s)
-      #
-      _s = TEMPLATES['defs_entry'] % (hash_name, hash_name)
-      f_defvars.write(_s)
-      _s = TEMPLATES['def_macro'] % (hash_name, symbol)
-      f_macros.write(_s)
-    f_gloss.close()
-    f_defvars.close()
-    f_macros.close()
-    self.modified = False
-    self.populateLineEdits()
-    self.setMode('choose')
-
-  def print_info(self):
-
-    f_log = open(self.file_log, 'w')
-    _l = list(self.gloss_entries.keys())
-    _l.sort()
-    for i in _l:
-      _s = '%s : %s\n' % (i, self.gloss_entries[i]['symbol'])
-      f_log.write(_s)
-    f_log.close()
-
-  def formatParse(self, s):
-    count = 0
-    arg_count = 0
-    a = []
-    # print len(s)
-    for i in s:
-      if count == 0:
-        if i == '{':
-          a.append('')
-      if i == '}':
-        count -= 1
-        if count == 0:
-          arg_count += 1
-      if count > 0:
-        a[arg_count] += i
-      if i == '{':
-        count += 1
-    return a
-
-  def setMode(self, mode):
-    buttons = ['Write', 'New', 'Edit', 'Delete', 'Accept', 'Clear']
-    lines = ['Hash', 'Symbol', 'SortKey', 'Description']
-    if mode == 'choose':
-      show_button = ['Edit', 'New', 'Delete']
-      show_lines = lines
-      disable_edit = True
-    elif mode == 'new':
-      show_button = []
-      show_lines = ['Hash']
-      disable_edit = False
-    elif mode == 'edit':
-      show_button = ['Accept']
-      show_lines = ['Symbol', 'SortKey', 'Description']
-      disable_edit = False
-    elif mode == 'accept':
-      show_button = ['Accept', 'Clear']
-      show_lines = lines
-      disable_edit = True
-    if self.modified:
-      show_button.append('Write')
-
-    for i in lines:
-      if i in show_lines:
-        eval('self.ui.lineEdit%s.setReadOnly(%s)' % (i, disable_edit))
+      # Save to disk
+      if self.glossary.save():
+        # Refresh the UI to reflect any changes
+        self._populate_ui()
+        
+        # Select the saved entry
+        index = self.ui.comboBoxHash.findText(new_hash)
+        if index >= 0:
+          self.ui.comboBoxHash.setCurrentIndex(index)
+          
+        # Switch back to view mode
+        self._set_edit_mode(False)
+        QMessageBox.information(self, "Success", "Entry saved successfully.")
       else:
-        eval('self.ui.lineEdit%s.setReadOnly(%s)' % (i, disable_edit))
+        QMessageBox.warning(
+          self,
+          "Error",
+          "Failed to save entry. Check the log for details."
+        )
+        
+      # Clear the original hash after successful save
+      if hasattr(self, '_original_hash'):
+        delattr(self, '_original_hash')
+    except Exception as e:
+      QMessageBox.critical(self, "Error", f"An error occurred: {str(e)}")
 
-    for i in buttons:
-      if i in show_button:
-        eval('self.ui.pushButton%s.show()' % i)
+  def on_show_list_clicked(self) -> None:
+    """Handle show list button click.
+    
+    Shows a list of all entries in the glossary using the list view dialog.
+    When an entry is selected, it will be selected in the main form.
+    """
+    if not self.glossary or not self.glossary.entries:
+      QMessageBox.information(self, "No Entries", "No entries available in the glossary.")
+      return
+    
+    try:
+      # Create and show the list view dialog
+      self.list_view = UI_ListView(pattern="%s", parent=self)
+      self.list_view.build(sorted(self.glossary.entries.keys()))
+      self.list_view.newSelection.connect(self._on_macro_selected)
+      self.list_view.show()
+      
+    except Exception as e:
+      QMessageBox.critical(self, "Error", f"Failed to show entry list: {str(e)}")
+      
+  def _on_macro_selected(self, macro_name: str) -> None:
+    """Handle selection of a macro from the list view.
+    
+    Args:
+        macro_name: The name of the selected macro
+    """
+    # Find and select the entry in the combo box
+    index = self.ui.comboBoxHash.findText(macro_name)
+    if index >= 0:
+      self.ui.comboBoxHash.setCurrentIndex(index)
+    self.list_view.close()
+
+  def on_new_clicked(self) -> None:
+    """Handle new entry button click."""
+
+    if not self._new_repository:
+      if not self.glossary:
+        QMessageBox.warning(self, "Error", "No glossary is loaded.")
+        return
+
+    # Clear the form and prepare for new entry
+    self._clear_form()
+
+    # Generate a default sort key (timestamp)
+    default_sort_key = QtCore.QDateTime.currentDateTime().toString("yyyyMMddhhmmss")
+    self.ui.lineEditSortKey.setText(default_sort_key)
+
+    # Set to edit mode
+    self._set_edit_mode(True)
+    self.ui.lineEditHash.setFocus()
+
+    # Store empty original hash to indicate new entry
+    self._original_hash = ""
+  
+  def on_edit_clicked(self) -> None:
+    """Handle edit button click for the current entry."""
+    if not self.glossary:
+      return
+      
+    hash_name = self.ui.lineEditHash.text()
+    if not hash_name:
+      return
+      
+    # Store the original hash in case it gets changed
+    self._original_hash = hash_name
+    
+    # Switch to edit mode
+    self._set_edit_mode(True)
+
+  def on_accept_clicked(self) -> None:
+    """Handle accept button click to save the current entry."""
+    if not self.glossary and not hasattr(self, '_new_repository'):
+      QMessageBox.warning(self, "Error", "No glossary is loaded.")
+      return
+
+    # Get the current values from the form
+    hash_name = self.ui.lineEditHash.text().strip()
+    symbol = self.ui.lineEditSymbol.text().strip()
+    description = self.ui.lineEditDescription.text().strip()
+    sort_key = self.ui.lineEditSortKey.text().strip()
+
+    # Validate inputs
+    if not all([hash_name, symbol, description, sort_key]):
+      QMessageBox.warning(self, "Error", "All fields are required.")
+      return
+
+    try:
+      # If this is a new repository, initialize it
+      if hasattr(self, '_new_repository') and self._new_repository:
+        # Get the directory from the most recent file operation or use a default
+        if hasattr(self, '_last_glossary_dir') and self._last_glossary_dir:
+          base_dir = self._last_glossary_dir
+        else:
+          # If we don't have a last used directory, ask the user
+          base_dir = QFileDialog.getExistingDirectory(
+                  self,
+                  "Select Glossary Directory",
+                  str(Path.home()),
+                  QFileDialog.Option.ShowDirsOnly
+                  )
+          if not base_dir:  # User cancelled
+            return
+          self._last_glossary_dir = base_dir
+
+        self.glossary = GlossaryManager(base_dir=base_dir)
+        self._new_repository = False  # Reset the flag
+
+      # Add or update the entry
+      self.glossary.entries[hash_name] = {
+              'symbol'     : symbol,
+              'description': description,
+              'sort_key'   : sort_key
+              }
+
+      # Save the glossary
+      if hasattr(self, '_original_hash') and self._original_hash and self._original_hash != hash_name:
+        # If the hash was changed, remove the old entry
+        if self._original_hash in self.glossary.entries:
+          del self.glossary.entries[self._original_hash]
+
+      # Save to disk
+      if self.glossary.save():
+        # Refresh the UI
+        self._populate_ui()
+
+        # Select the saved entry
+        index = self.ui.comboBoxHash.findText(hash_name)
+        if index >= 0:
+          self.ui.comboBoxHash.setCurrentIndex(index)
+
+        # Switch back to view mode
+        self._set_edit_mode(False)
+        QMessageBox.information(self, "Success", "Entry saved successfully.")
       else:
-        eval('self.ui.pushButton%s.hide()' % i)
+        QMessageBox.warning(
+                self,
+                "Error",
+                "Failed to save entry. Check the log for details."
+                )
 
-    for i in lines:
-      if i in show_lines:
-        eval('self.ui.lineEdit%s.show()' % i)
+    except Exception as e:
+      QMessageBox.critical(self, "Error", f"Failed to save entry: {str(e)}")
+  
+  def on_delete_clicked(self) -> None:
+    """Handle delete button click for the current entry."""
+    if not self.glossary:
+      return
+      
+    hash_name = self.ui.comboBoxHash.currentText()
+    if not hash_name or hash_name not in self.glossary.entries:
+      return
+      
+    # Ask for confirmation
+    reply = QMessageBox.question(
+      self,
+      'Confirm Delete',
+      f'Are you sure you want to delete the entry "{hash_name}"?',
+      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+      QMessageBox.StandardButton.No
+    )
+    
+    if reply == QMessageBox.StandardButton.Yes:
+      # Delete the entry
+      del self.glossary.entries[hash_name]
+      
+      # Update the UI
+      current_index = self.ui.comboBoxHash.currentIndex()
+      self._populate_ui()
+      
+      # Select the next item or clear if no items left
+      if self.ui.comboBoxHash.count() > 0:
+        new_index = min(current_index, self.ui.comboBoxHash.count() - 1)
+        self.ui.comboBoxHash.setCurrentIndex(new_index if new_index >= 0 else 0)
       else:
-        eval('self.ui.lineEdit%s.hide()' % i)
+        self.on_new_clicked()
 
-  def populateComboBox(self):
-    self.populating = True
-    # 		print self.gloss_entries.keys(), len(self.gloss_entries.keys())
-    hashes = sorted(self.gloss_entries.keys())
-    # hashes.sort()
+  def _clear_form(self) -> None:
+    """Clear all form fields and reset the selection."""
+    self.ui.comboBoxHash.setCurrentIndex(-1)
+    self.ui.lineEditHash.clear()
+    self.ui.lineEditSymbol.clear()
+    self.ui.lineEditDescription.clear()
+    self.ui.lineEditSortKey.clear()
+    self._set_edit_mode(False)
+    if hasattr(self, '_original_hash'):
+      delattr(self, '_original_hash')
+
+  def on_cancel_clicked(self) -> None:
+    """Handle cancel button click to exit edit mode and clear or restore form."""
+    if hasattr(self, '_original_hash'):
+      # If we were creating a new entry, clear the form
+      if not self._original_hash:
+        self._clear_form()
+      # If we were editing an existing entry, restore its values
+      elif self._original_hash in self.glossary.entries:
+        entry = self.glossary.entries[self._original_hash]
+        self.ui.lineEditHash.setText(self._original_hash)
+        self.ui.lineEditSymbol.setText(entry['symbol'])
+        self.ui.lineEditDescription.setText(entry['description'])
+        self.ui.lineEditSortKey.setText(entry['sort_key'])
+        self._set_edit_mode(False)
+        delattr(self, '_original_hash')
+    else:
+      self._clear_form()
+
+  def _set_edit_mode(self, edit_mode: bool) -> None:
+    """Set the UI to edit mode or view mode.
+
+    Args:
+        edit_mode: If True, the form will be in edit mode. If False, view mode.
+    """
+    # Set read-only state of input fields
+    self.ui.lineEditHash.setReadOnly(not edit_mode)
+    self.ui.lineEditSymbol.setReadOnly(not edit_mode)
+    self.ui.lineEditDescription.setReadOnly(not edit_mode)
+    self.ui.lineEditSortKey.setReadOnly(not edit_mode)
+
+    # Show/hide buttons based on mode
+    self.ui.pushButtonNew.setVisible(not edit_mode)
+    self.ui.pushButtonEdit.setVisible(not edit_mode)
+    self.ui.pushButtonDelete.setVisible(not edit_mode)
+    self.ui.pushButtonCancel.setVisible(edit_mode)
+    self.ui.pushButtonAccept.setVisible(edit_mode)
+    self.ui.pushButtonWrite.setVisible(not edit_mode)
+
+    # Enable/disable the hash combo box
+    self.ui.comboBoxHash.setEnabled(not edit_mode)
+
+    # If switching to view mode, clear any selection
+    if not edit_mode:
+      self.ui.comboBoxHash.setCurrentIndex(-1)
+
+  def on_entry_selected(self, index: int) -> None:
+    """Handle selection change in the hash combo box."""
+    if not self.glossary or index < 0:
+      self.ui.pushButtonEdit.setEnabled(False)
+      self.ui.pushButtonDelete.setEnabled(False)
+      return
+
+    hash_name = self.ui.comboBoxHash.currentText()
+    if hash_name and hash_name in self.glossary.entries:
+      entry = self.glossary.entries[hash_name]
+      self.ui.lineEditHash.setText(hash_name)
+      self.ui.lineEditSymbol.setText(entry['symbol'])
+      self.ui.lineEditDescription.setText(entry['description'])
+      self.ui.lineEditSortKey.setText(entry['sort_key'])
+
+      # Enable edit and delete buttons when an entry is selected
+      self.ui.pushButtonEdit.setEnabled(True)
+      self.ui.pushButtonDelete.setEnabled(True)
+
+  def _browse_for_directory(self) -> None:
+    """Show file dialog to select a directory."""
+    default_dir = Path.home() / '.glossaries'
+    if not default_dir.exists():
+        default_dir = Path.cwd()
+
+    dir_path = QFileDialog.getExistingDirectory(
+        self,
+        "Select Glossary Directory",
+        str(default_dir)
+    )
+
+    if dir_path:  # User didn't cancel
+        self._load_glossary(dir_path)
+
+  def _load_glossary(self, dir_path: str) -> None:
+    """Load glossary from the specified directory."""
+    try:
+      self.glossary = GlossaryManager(base_dir=dir_path)
+      self.glossary.load()
+      self._last_glossary_dir = dir_path  # Store the directory for future use
+      self._populate_ui()
+      self._update_ui_state(True)  # Make sure this is called with loaded=True
+      QMessageBox.information(self, "Success", "Glossary loaded successfully.")
+    except Exception as e:
+      QMessageBox.critical(self, "Error", f"Failed to load glossary: {str(e)}")
+      self.glossary = None
+      self._update_ui_state(False)
+
+  def _populate_ui(self) -> None:
+    """Populate UI with glossary entries."""
+    if not self.glossary:
+      return
+
+    # Block signals to prevent multiple updates
+    self.ui.comboBoxHash.blockSignals(True)
     self.ui.comboBoxHash.clear()
-    self.ui.comboBoxHash.addItems(hashes) #QtCore.QStringList(hashes))
-    self.macro_list.build(hashes)
-    self.populating = False
 
-  def populateLineEdits(self):
-    hash_name = str(self.ui.comboBoxHash.currentText())
-    symbol = self.gloss_entries[hash_name]['symbol']
-    sort_key = self.gloss_entries[hash_name]['sort_key']
-    description = self.gloss_entries[hash_name]['description']
-    self.ui.lineEditHash.setText(hash_name) #QtCore.QString(hash_name))
-    self.ui.lineEditSymbol.setText(symbol) #QtCore.QString(symbol))
-    self.ui.lineEditSortKey.setText(sort_key) #QtCore.QString(sort_key))
-    self.ui.lineEditDescription.setText(description) #QtCore.QString(description))
+    # Add all entries to the combo box
+    for hash_name in sorted(self.glossary.entries):
+      self.ui.comboBoxHash.addItem(hash_name)
 
+    # Enable signals again
+    self.ui.comboBoxHash.blockSignals(False)
 
-    # signal handling
+    # If there are entries, select the first one
+    if self.glossary.entries:
+      self.ui.comboBoxHash.setCurrentIndex(0)
+      # Manually trigger the update of line edits
+      self.on_entry_selected(0)
 
-  def on_pushButtonLoad_pressed(self):
-    print
-    'load pressed'
-    pass
+  def _update_ui_state(self, loaded: bool) -> None:
+    """Update UI state based on whether a glossary is loaded."""
+    # Initially hide all buttons except Load and New Repository
+    self.ui.pushButtonShowList.setVisible(False)
+    self.ui.pushButtonWrite.setVisible(False)
+    self.ui.pushButtonNew.setVisible(False)
+    self.ui.pushButtonEdit.setVisible(False)
+    self.ui.pushButtonDelete.setVisible(False)
+    self.ui.pushButtonAccept.setVisible(False)
+    self.ui.pushButtonCancel.setVisible(False)
+    self.ui.comboBoxHash.setVisible(False)
 
-  def on_pushButtonWrite_pressed(self):
-    print
-    'write pressed'
-    self.write_files()
-    pass
+    # Always show these buttons
+    self.ui.pushButtonLoad.setVisible(True)
+    self.ui.pushButtonNewRepo.setVisible(True)
 
-  def on_pushButtonPrint_pressed(self):
-    print
-    'print pressed'
-    self.print_info()
+    # If a glossary is loaded, show the appropriate buttons
+    if loaded:
+      self.ui.pushButtonShowList.setVisible(True)
+      self.ui.pushButtonNew.setVisible(True)
+      self.ui.comboBoxHash.setVisible(True)
 
-  def on_pushButtonNew_pressed(self):
-    print
-    'Edit pressed'
-    self.setMode('new')
-    self.on_pushButtonClear_pressed()
-    pass
-
-  def on_pushButtonEdit_pressed(self):
-    print
-    'Edit pressed'
-    self.setMode('edit')
-    self.populateLineEdits()
-
-  def on_pushButtonStop_pressed(self):
-    print
-    'Stop pressed'
-    self.setMode('choose')
-    self.populateLineEdits()
-
-    pass
-
-  def on_pushButtonDelete_pressed(self):
-    print
-    'delete pressed'
-    hash_name = str(self.ui.comboBoxHash.currentText())
-    del self.gloss_entries[hash_name]
-    self.populateComboBox()
-    self.ui.comboBoxHash.setCurrentIndex(0)
-    self.populateLineEdits()
-    self.modified = True
-    self.setMode('choose')
-    pass
-
-  def on_pushButtonAccept_pressed(self):
-    print
-    'accept pressed'
-
-    hash_name = str(self.ui.lineEditHash.text())
-    symbol = str(self.ui.lineEditSymbol.text())
-    sort_key = str(self.ui.lineEditSortKey.text())
-    description = str(self.ui.lineEditDescription.text())
-    self.gloss_entries[hash_name] = {}
-    self.gloss_entries[hash_name]['symbol'] = symbol
-    self.gloss_entries[hash_name]['description'] = description
-    self.gloss_entries[hash_name]['sort_key'] = sort_key
-    self.on_pushButtonClear_pressed()
-    self.populateComboBox()
-    self.populateLineEdits()
-    self.modified = True
-    self.setMode('choose')
-    pass
-
-  def on_pushButtonClear_pressed(self):
-    print
-    'clear pressed'
-
-    lines = ['Hash', 'Symbol', 'SortKey', 'Description']
-    for i in lines:
-      eval('self.ui.lineEdit%s.clear()' % i)
-
-    # 		self.ui.lineEditHash.clear()
-    # 		self.ui.lineEditSymbol.clear()
-    # 		self.ui.lineEdit.clear()
-    # 		self.ui.lineEditDescription.clear()
-    pass
-
-  def on_pushButtonShowList_pressed(self):
-    self.macro_list.show()
-    self.macro_list.topLevelWidget()
-
-  # @QtCore.pyqtSignature('int')
-
-  def on_comboBoxHash_currentIndexChanged(self, n):
-    if self.populating:
-      return
-    print
-    'Hash index changed', n
-    self.on_pushButtonClear_pressed()
-    self.populateLineEdits()
-    self.setMode('choose')
-    pass
-
-  # @QtCore.pyqtSignature('QString')
-  def on_comboBoxHash_activated(self, s):
-    _s = str(s)
-    self.clipboard.clear()
-    self.clipboard.setText(r'\%s'%_s)
-
-  def on_lineEditHash_textEdited(self):
-    # 		print 'hash modified text', self.ui.lineEditHash.text()
-    pass
-
-  def on_lineEditHash_returnPressed(self):
-    hash_name = str(self.ui.lineEditHash.text())
-    if hash_name in self.gloss_entries.keys():
-      self.ui.lineEditHash.clear()
-      self.ui.lineEditHash.setPlaceholderText('already defined')
-      return
-
-    self.ui.lineEditSymbol.show()
-    self.ui.lineEditSymbol.setFocus()
-    self.hash_name = hash_name
-
-  def on_lineEditSymbol_returnPressed(self):
-    symbol = str(self.ui.lineEditSymbol.text())
-    if symbol == '':
-      return
-    if symbol in self.symbol_list:
-      self.ui.lineEditSymbol.clear()
-      self.ui.lineEditSymbol.setPlaceholderText('already defined')
-      return
-    self.ui.lineEditSortKey.show()
-    self.ui.lineEditSortKey.setFocus()
-
-  def on_lineEditSortKey_returnPressed(self):
-    sort_key = str(self.ui.lineEditSymbol.text())
-    if sort_key == '':
-      return
-    self.ui.lineEditDescription.show()
-    self.ui.lineEditDescription.setFocus()
-
-  def on_lineEditDescription_returnPressed(self):
-    description = str(self.ui.lineEditDescription.text())
-    if description == '':
-      return
-    self.setMode('accept')
-
-  def closeEvent(self, event):
-    self.macro_list.close()
-    self.close()
+      # Show edit/delete buttons if an entry is selected
+      if hasattr(self, '_original_hash') or self.ui.comboBoxHash.currentIndex() >= 0:
+        self.ui.pushButtonEdit.setVisible(True)
+        self.ui.pushButtonDelete.setVisible(True)
