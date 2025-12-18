@@ -1,12 +1,96 @@
 from pathlib import Path
-from typing import Optional, List
-from PyQt6 import QtCore, QtWidgets
-from PyQt6.QtWidgets import QFileDialog, QMessageBox, QMenu, QInputDialog
+from typing import Optional
 
-from editor import Ui_Form
-from models import GlossaryManager
+from PyQt6 import QtCore
+from PyQt6 import QtWidgets
+from PyQt6.QtWidgets import QFileDialog
+from PyQt6.QtWidgets import QMenu
+from PyQt6.QtWidgets import QMessageBox
+
 from directory_history import DirectoryHistory
+from editor import Ui_Form
 from listview_impl import UI_ListView
+from models import GlossaryManager
+
+
+class UI_EntntiesControl():
+  def __init__(self, uis):
+    self.items = {"controlRepro"  : uis.groupBoxReproControl,
+                  "recordContents": uis.groupBoxRecordContents,
+                  "recordControl" : uis.groupBoxRecordControl,
+                  # buttons
+                  "newRepository" : uis.pushButtonNewRepo,
+                  "load"          : uis.pushButtonLoad,
+                  "select"        : uis.pushButtonShowList,
+                  "edit"          : uis.pushButtonEdit,
+                  "new"           : uis.pushButtonNew,
+                  "delete"        : uis.pushButtonDelete,
+                  "cancel"        : uis.pushButtonCancel,
+                  "accept"        : uis.pushButtonAccept,
+                  # form
+                  "latex": uis.comboBoxHash,
+                  "hash" : uis.lineEditHash,
+                  "symbol" : uis.lineEditSymbol,
+                  "description" : uis.lineEditDescription,
+                  "sortKey" : uis.lineEditSortKey,
+                  }
+
+  def show(self, mode):
+    for item in self.items:
+      self.items[item].setVisible(True)
+
+  def hide(self, mode):
+    for item in self.items:
+      self.items[item].setVisible(False)
+
+  def control(self, mode):
+    visible = []
+    hide = []
+    if mode == "start":
+      visible = ["controlRepro"]
+      hide = ["recordContents", "recordControl"]
+    elif mode == "newRepository":
+      visible = ["controlRepro"]
+      hide = ["load", "newRepository", "recordContents", "recordControl"]
+    elif mode == "load":
+      visible = ["controlRepro", "recordControl"]
+      hide = ["newRepository", "recordContents",
+              "edit", "new", "delete", "accept", "cancel"]
+
+    elif mode == "edit":
+      visible = ["controlRepro", "recordControl", "recordContents",
+                 "edit", "new", "select"]
+      hide = ["newRepository", "accept", "cancel"]
+
+    elif mode == "firstRecord":
+      visible = ["controlRepro", "recordControl", "recordContents",
+                 "edit", "new"]
+      hide = ["newRepository", "accept", "cancel"]
+
+    elif mode == "editRecord":
+      visible = ["recordControl", "recordContents",
+                 "cancel", "accept"]
+      hide = ["controlRepro",
+              "select", "edit", "delete", "new"]
+
+    elif mode == "cancel":
+      visible = ["recordControl",
+                 "select"]
+      hide = ["controlRepro",  "recordContents",
+              "edit", "new", "delete", "accept", "cancel"]
+
+    for i in visible:
+      self.items[i].setVisible(True)
+    for i in hide:
+      self.items[i].setVisible(False)
+
+  def formEditMode(self, mode):
+    self.items["hash"].setReadOnly(not mode)
+    self.items["symbol"].setReadOnly(not mode)
+    self.items["description"].setReadOnly(not mode)
+    self.items["sortKey"].setReadOnly(not mode)
+    self.items["latex"].setEnabled(not mode)
+
 
 
 class UI(QtWidgets.QWidget):
@@ -26,17 +110,18 @@ class UI(QtWidgets.QWidget):
     # Connect buttons
     self.ui.pushButtonNewRepo.clicked.connect(self._create_new_repository)
     self.ui.pushButtonLoad.clicked.connect(self.on_load_clicked)
-    self.ui.pushButtonWrite.clicked.connect(self.on_save_clicked)
     self.ui.pushButtonShowList.clicked.connect(self.on_show_list_clicked)
     self.ui.pushButtonNew.clicked.connect(self.on_new_clicked)
     self.ui.pushButtonEdit.clicked.connect(self.on_edit_clicked)
     self.ui.pushButtonDelete.clicked.connect(self.on_delete_clicked)
     self.ui.pushButtonCancel.clicked.connect(self.on_cancel_clicked)
-    self.ui.pushButtonAccept.clicked.connect(self.on_accept_clicked)  # Add this line
-
+    self.ui.pushButtonAccept.clicked.connect(self.on_accept_clicked)
     self.ui.comboBoxHash.currentIndexChanged.connect(self.on_entry_selected)
-    self._set_edit_mode(False)
-    self._update_ui_state(False)
+
+    # setup interface components
+    self._ui_entities = UI_EntntiesControl(self.ui)
+    self._ui_entities.control("start")
+
 
   def _create_new_repository(self) -> None:
     """Create a new glossary repository with empty files."""
@@ -103,7 +188,7 @@ class UI(QtWidgets.QWidget):
               f"New glossary repository created at {dir_path}"
               )
       self._new_repository = True
-      self._set_edit_mode(True)
+      self._control_ui("edit")
 
     except Exception as e:
       QMessageBox.critical(
@@ -119,99 +204,35 @@ class UI(QtWidgets.QWidget):
     Args:
         dir_path: Optional directory path to load directly (used for recent directories)
     """
-    if not dir_path:
-        # Show recent directories in a menu
-        recent_dirs = self.dir_history.get_recent_directories()
+    if dir_path:
+      # Directory was provided (from recent directories)
+      self._load_glossary(dir_path)
+      return
 
-        if recent_dirs:
-            menu = QMenu(self)
+    # Show recent directories in a menu
+    recent_dirs = self.dir_history.get_recent_directories()
 
-            # Add recent directories
-            for dir_path in recent_dirs:
-                action = menu.addAction(dir_path)
-                action.triggered.connect(
-                    lambda checked, path=dir_path: self.on_load_clicked(path)
+    if recent_dirs:
+      menu = QMenu(self)
+      # Add recent directories
+      for dir_path in recent_dirs:
+        action = menu.addAction(dir_path)
+        action.triggered.connect(
+                lambda checked, path=dir_path: self.on_load_clicked(path)
                 )
 
-            # Add option to browse
-            menu.addSeparator()
-            browse_action = menu.addAction("Browse...")
-            browse_action.triggered.connect(self._browse_for_directory)
+      # Add option to browse
+      menu.addSeparator()
+      browse_action = menu.addAction("Browse...")
+      browse_action.triggered.connect(lambda: self._browse_for_directory())
 
-            # Show the menu at the button position
-            menu.exec(self.ui.pushButtonShowList.mapToGlobal(
-                self.ui.pushButtonShowList.rect().bottomLeft()
-            ))
-            return
-        else:
-            # No recent directories, just browse
-            self._browse_for_directory()
+      # Show the menu at the button position
+      menu.exec(self.ui.pushButtonLoad.mapToGlobal(
+              self.ui.pushButtonLoad.rect().bottomLeft()
+              ))
     else:
-        # Directory was provided (from recent directories)
-        self._load_glossary(dir_path)
-
-  def on_save_clicked(self) -> None:
-    """Handle save button click."""
-    if not self.glossary:
-      QMessageBox.warning(self, "Error", "No glossary is loaded.")
-      return
-
-    # Get the current values from the UI
-    new_hash = self.ui.lineEditHash.text().strip()
-    symbol = self.ui.lineEditSymbol.text().strip()
-    description = self.ui.lineEditDescription.text().strip()
-    sort_key = self.ui.lineEditSortKey.text().strip()
-
-    # Validate inputs
-    if not all([new_hash, symbol, description, sort_key]):
-      QMessageBox.warning(self, "Error", "All fields are required.")
-      return
-      
-    # Check if this is a new hash and it already exists
-    if hasattr(self, '_original_hash') and new_hash != self._original_hash and new_hash in self.glossary.entries:
-      QMessageBox.warning(self, "Error", f"An entry with hash '{new_hash}' already exists.")
-      self.ui.lineEditHash.setFocus()
-      return
-
-    # Update the entry in the glossary
-    try:
-      # If the hash name changed, remove the old entry and add a new one
-      if hasattr(self, '_original_hash') and self._original_hash and new_hash != self._original_hash:
-        if self._original_hash in self.glossary.entries:
-          self.glossary.entries[new_hash] = self.glossary.entries.pop(self._original_hash)
-      
-      # Add or update the entry
-      self.glossary.entries[new_hash] = {
-              'symbol'     : symbol,
-              'description': description,
-              'sort_key'   : sort_key
-              }
-
-      # Save to disk
-      if self.glossary.save():
-        # Refresh the UI to reflect any changes
-        self._populate_ui()
-        
-        # Select the saved entry
-        index = self.ui.comboBoxHash.findText(new_hash)
-        if index >= 0:
-          self.ui.comboBoxHash.setCurrentIndex(index)
-          
-        # Switch back to view mode
-        self._set_edit_mode(False)
-        QMessageBox.information(self, "Success", "Entry saved successfully.")
-      else:
-        QMessageBox.warning(
-          self,
-          "Error",
-          "Failed to save entry. Check the log for details."
-        )
-        
-      # Clear the original hash after successful save
-      if hasattr(self, '_original_hash'):
-        delattr(self, '_original_hash')
-    except Exception as e:
-      QMessageBox.critical(self, "Error", f"An error occurred: {str(e)}")
+      # No recent directories, just browse
+      self._browse_for_directory()
 
   def on_show_list_clicked(self) -> None:
     """Handle show list button click.
@@ -222,17 +243,17 @@ class UI(QtWidgets.QWidget):
     if not self.glossary or not self.glossary.entries:
       QMessageBox.information(self, "No Entries", "No entries available in the glossary.")
       return
-    
+
     try:
       # Create and show the list view dialog
       self.list_view = UI_ListView(pattern="%s", parent=self)
       self.list_view.build(sorted(self.glossary.entries.keys()))
       self.list_view.newSelection.connect(self._on_macro_selected)
       self.list_view.show()
-      
+
     except Exception as e:
       QMessageBox.critical(self, "Error", f"Failed to show entry list: {str(e)}")
-      
+
   def _on_macro_selected(self, macro_name: str) -> None:
     """Handle selection of a macro from the list view.
     
@@ -261,26 +282,27 @@ class UI(QtWidgets.QWidget):
     self.ui.lineEditSortKey.setText(default_sort_key)
 
     # Set to edit mode
-    self._set_edit_mode(True)
+    self._ui_entities.control("edit")
     self.ui.lineEditHash.setFocus()
 
     # Store empty original hash to indicate new entry
     self._original_hash = ""
-  
+
   def on_edit_clicked(self) -> None:
     """Handle edit button click for the current entry."""
     if not self.glossary:
       return
-      
+
     hash_name = self.ui.lineEditHash.text()
     if not hash_name:
       return
-      
+
     # Store the original hash in case it gets changed
     self._original_hash = hash_name
-    
+
     # Switch to edit mode
-    self._set_edit_mode(True)
+    self._ui_entities.control("editRecord")
+    self._ui_entities.formEditMode(True)
 
   def on_accept_clicked(self) -> None:
     """Handle accept button click to save the current entry."""
@@ -304,7 +326,7 @@ class UI(QtWidgets.QWidget):
       if hasattr(self, '_new_repository') and self._new_repository:
         # Get the directory from the most recent file operation or use a default
         if hasattr(self, '_last_glossary_dir') and self._last_glossary_dir:
-          base_dir = self._last_glossary_dir
+          base_dir = Path(self._last_glossary_dir)
         else:
           # If we don't have a last used directory, ask the user
           base_dir = QFileDialog.getExistingDirectory(
@@ -315,7 +337,7 @@ class UI(QtWidgets.QWidget):
                   )
           if not base_dir:  # User cancelled
             return
-          self._last_glossary_dir = base_dir
+          self._last_glossary_dir = Path(base_dir)
 
         self.glossary = GlossaryManager(base_dir=base_dir)
         self._new_repository = False  # Reset the flag
@@ -334,7 +356,7 @@ class UI(QtWidgets.QWidget):
           del self.glossary.entries[self._original_hash]
 
       # Save to disk
-      if self.glossary.save():
+      if self.glossary.save():  # note all changes are updating the file
         # Refresh the UI
         self._populate_ui()
 
@@ -344,7 +366,8 @@ class UI(QtWidgets.QWidget):
           self.ui.comboBoxHash.setCurrentIndex(index)
 
         # Switch back to view mode
-        self._set_edit_mode(False)
+        self._ui_entities.control("load")
+        self._ui_entities.formEditMode(False)
         QMessageBox.information(self, "Success", "Entry saved successfully.")
       else:
         QMessageBox.warning(
@@ -352,36 +375,37 @@ class UI(QtWidgets.QWidget):
                 "Error",
                 "Failed to save entry. Check the log for details."
                 )
+        self._control_ui("editForm")
 
     except Exception as e:
       QMessageBox.critical(self, "Error", f"Failed to save entry: {str(e)}")
-  
+
   def on_delete_clicked(self) -> None:
     """Handle delete button click for the current entry."""
     if not self.glossary:
       return
-      
+
     hash_name = self.ui.comboBoxHash.currentText()
     if not hash_name or hash_name not in self.glossary.entries:
       return
-      
+
     # Ask for confirmation
     reply = QMessageBox.question(
-      self,
-      'Confirm Delete',
-      f'Are you sure you want to delete the entry "{hash_name}"?',
-      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-      QMessageBox.StandardButton.No
-    )
-    
+            self,
+            'Confirm Delete',
+            f'Are you sure you want to delete the entry "{hash_name}"?',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+            )
+
     if reply == QMessageBox.StandardButton.Yes:
       # Delete the entry
       del self.glossary.entries[hash_name]
-      
+
       # Update the UI
       current_index = self.ui.comboBoxHash.currentIndex()
       self._populate_ui()
-      
+
       # Select the next item or clear if no items left
       if self.ui.comboBoxHash.count() > 0:
         new_index = min(current_index, self.ui.comboBoxHash.count() - 1)
@@ -396,7 +420,7 @@ class UI(QtWidgets.QWidget):
     self.ui.lineEditSymbol.clear()
     self.ui.lineEditDescription.clear()
     self.ui.lineEditSortKey.clear()
-    self._set_edit_mode(False)
+    self._ui_entities.formEditMode(False)
     if hasattr(self, '_original_hash'):
       delattr(self, '_original_hash')
 
@@ -413,10 +437,12 @@ class UI(QtWidgets.QWidget):
         self.ui.lineEditSymbol.setText(entry['symbol'])
         self.ui.lineEditDescription.setText(entry['description'])
         self.ui.lineEditSortKey.setText(entry['sort_key'])
-        self._set_edit_mode(False)
+        self._ui_entities.formEditMode(False)
         delattr(self, '_original_hash')
     else:
       self._clear_form()
+
+    self._ui_entities.control("cancel")
 
   def _set_edit_mode(self, edit_mode: bool) -> None:
     """Set the UI to edit mode or view mode.
@@ -448,9 +474,15 @@ class UI(QtWidgets.QWidget):
   def on_entry_selected(self, index: int) -> None:
     """Handle selection change in the hash combo box."""
     if not self.glossary or index < 0:
-      self.ui.pushButtonEdit.setEnabled(False)
-      self.ui.pushButtonDelete.setEnabled(False)
+      # self.ui.pushButtonEdit.setEnabled(False)
+      # self.ui.pushButtonDelete.setEnabled(False)
       return
+    else:
+      self._ui_entities.control("edit")
+      self._ui_entities.formEditMode(False)
+      # self._ui_entities.formEditMode(True)
+      # self.ui.pushButtonEdit.setEnabled(True)
+      # self.ui.pushButtonDelete.setEnabled(True)
 
     hash_name = self.ui.comboBoxHash.currentText()
     if hash_name and hash_name in self.glossary.entries:
@@ -460,24 +492,25 @@ class UI(QtWidgets.QWidget):
       self.ui.lineEditDescription.setText(entry['description'])
       self.ui.lineEditSortKey.setText(entry['sort_key'])
 
-      # Enable edit and delete buttons when an entry is selected
-      self.ui.pushButtonEdit.setEnabled(True)
-      self.ui.pushButtonDelete.setEnabled(True)
+
+      # # Enable edit and delete buttons when an entry is selected
+      # self.ui.pushButtonEdit.setEnabled(True)
+      # self.ui.pushButtonDelete.setEnabled(True)
 
   def _browse_for_directory(self) -> None:
     """Show file dialog to select a directory."""
     default_dir = Path.home() / '.glossaries'
     if not default_dir.exists():
-        default_dir = Path.cwd()
+      default_dir = Path.cwd()
 
     dir_path = QFileDialog.getExistingDirectory(
-        self,
-        "Select Glossary Directory",
-        str(default_dir)
-    )
+            self,
+            "Select Glossary Directory",
+            str(default_dir)
+            )
 
     if dir_path:  # User didn't cancel
-        self._load_glossary(dir_path)
+      self._load_glossary(dir_path)
 
   def _load_glossary(self, dir_path: str) -> None:
     """Load glossary from the specified directory."""
@@ -485,13 +518,16 @@ class UI(QtWidgets.QWidget):
       self.glossary = GlossaryManager(base_dir=dir_path)
       self.glossary.load()
       self._last_glossary_dir = dir_path  # Store the directory for future use
+      self.dir_history.add_directory(dir_path)  # Add this line to save to history
       self._populate_ui()
-      self._update_ui_state(True)  # Make sure this is called with loaded=True
-      QMessageBox.information(self, "Success", "Glossary loaded successfully.")
+      # self._update_ui_state(True)  # Make sure this is called with loaded=True
+      # QMessageBox.information(self, "Success", "Glossary loaded successfully.")
+      self._ui_entities.control("load")
+
     except Exception as e:
       QMessageBox.critical(self, "Error", f"Failed to load glossary: {str(e)}")
       self.glossary = None
-      self._update_ui_state(False)
+      self._ui_entities.control("start")
 
   def _populate_ui(self) -> None:
     """Populate UI with glossary entries."""
