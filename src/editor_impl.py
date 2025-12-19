@@ -111,12 +111,12 @@ class UI(QtWidgets.QWidget):
     self.ui.pushButtonNewRepo.clicked.connect(self._create_new_repository)
     self.ui.pushButtonLoad.clicked.connect(self.on_load_clicked)
     self.ui.pushButtonShowList.clicked.connect(self.on_show_list_clicked)
-    self.ui.pushButtonNew.clicked.connect(self.on_new_clicked)
-    self.ui.pushButtonEdit.clicked.connect(self.on_edit_clicked)
-    self.ui.pushButtonDelete.clicked.connect(self.on_delete_clicked)
-    self.ui.pushButtonCancel.clicked.connect(self.on_cancel_clicked)
-    self.ui.pushButtonAccept.clicked.connect(self.on_accept_clicked)
-    self.ui.comboBoxHash.currentIndexChanged.connect(self.on_entry_selected)
+    self.ui.pushButtonNew.clicked.connect(self.on_new_macro_clicked)
+    self.ui.pushButtonEdit.clicked.connect(self.on_edit_macro_clicked)
+    self.ui.pushButtonDelete.clicked.connect(self.on_delete_macro_clicked)
+    self.ui.pushButtonCancel.clicked.connect(self.on_cancel_macro_definition_clicked)
+    self.ui.pushButtonAccept.clicked.connect(self.on_accept_macro_clicked)
+    self.ui.comboBoxHash.currentIndexChanged.connect(self.on_entry_in_macro_combo_selected)
 
     # setup interface components
     self._ui_entities = UI_EntntiesControl(self.ui)
@@ -266,7 +266,7 @@ class UI(QtWidgets.QWidget):
       self.ui.comboBoxHash.setCurrentIndex(index)
     self.list_view.close()
 
-  def on_new_clicked(self) -> None:
+  def on_new_macro_clicked(self) -> None:
     """Handle new entry button click."""
 
     if not self._new_repository:
@@ -288,7 +288,7 @@ class UI(QtWidgets.QWidget):
     # Store empty original hash to indicate new entry
     self._original_hash = ""
 
-  def on_edit_clicked(self) -> None:
+  def on_edit_macro_clicked(self) -> None:
     """Handle edit button click for the current entry."""
     if not self.glossary:
       return
@@ -304,7 +304,7 @@ class UI(QtWidgets.QWidget):
     self._ui_entities.control("editRecord")
     self._ui_entities.formEditMode(True)
 
-  def on_accept_clicked(self) -> None:
+  def on_accept_macro_clicked(self) -> None:
     """Handle accept button click to save the current entry."""
     if not self.glossary and not hasattr(self, '_new_repository'):
       QMessageBox.warning(self, "Error", "No glossary is loaded.")
@@ -380,7 +380,7 @@ class UI(QtWidgets.QWidget):
     except Exception as e:
       QMessageBox.critical(self, "Error", f"Failed to save entry: {str(e)}")
 
-  def on_delete_clicked(self) -> None:
+  def on_delete_macro_clicked(self) -> None:
     """Handle delete button click for the current entry."""
     if not self.glossary:
       return
@@ -411,7 +411,7 @@ class UI(QtWidgets.QWidget):
         new_index = min(current_index, self.ui.comboBoxHash.count() - 1)
         self.ui.comboBoxHash.setCurrentIndex(new_index if new_index >= 0 else 0)
       else:
-        self.on_new_clicked()
+        self.on_new_macro_clicked()
 
   def _clear_form(self) -> None:
     """Clear all form fields and reset the selection."""
@@ -424,7 +424,7 @@ class UI(QtWidgets.QWidget):
     if hasattr(self, '_original_hash'):
       delattr(self, '_original_hash')
 
-  def on_cancel_clicked(self) -> None:
+  def on_cancel_macro_definition_clicked(self) -> None:
     """Handle cancel button click to exit edit mode and clear or restore form."""
     if hasattr(self, '_original_hash'):
       # If we were creating a new entry, clear the form
@@ -471,7 +471,7 @@ class UI(QtWidgets.QWidget):
     if not edit_mode:
       self.ui.comboBoxHash.setCurrentIndex(-1)
 
-  def on_entry_selected(self, index: int) -> None:
+  def on_entry_in_macro_combo_selected(self, index: int) -> None:
     """Handle selection change in the hash combo box."""
     if not self.glossary or index < 0:
       # self.ui.pushButtonEdit.setEnabled(False)
@@ -549,31 +549,31 @@ class UI(QtWidgets.QWidget):
     if self.glossary.entries:
       self.ui.comboBoxHash.setCurrentIndex(0)
       # Manually trigger the update of line edits
-      self.on_entry_selected(0)
+      self.on_entry_in_macro_combo_selected(0)
 
-  def _update_ui_state(self, loaded: bool) -> None:
-    """Update UI state based on whether a glossary is loaded."""
-    # Initially hide all buttons except Load and New Repository
-    self.ui.pushButtonShowList.setVisible(False)
-    self.ui.pushButtonWrite.setVisible(False)
-    self.ui.pushButtonNew.setVisible(False)
-    self.ui.pushButtonEdit.setVisible(False)
-    self.ui.pushButtonDelete.setVisible(False)
-    self.ui.pushButtonAccept.setVisible(False)
-    self.ui.pushButtonCancel.setVisible(False)
-    self.ui.comboBoxHash.setVisible(False)
-
-    # Always show these buttons
-    self.ui.pushButtonLoad.setVisible(True)
-    self.ui.pushButtonNewRepo.setVisible(True)
-
-    # If a glossary is loaded, show the appropriate buttons
-    if loaded:
-      self.ui.pushButtonShowList.setVisible(True)
-      self.ui.pushButtonNew.setVisible(True)
-      self.ui.comboBoxHash.setVisible(True)
-
-      # Show edit/delete buttons if an entry is selected
-      if hasattr(self, '_original_hash') or self.ui.comboBoxHash.currentIndex() >= 0:
-        self.ui.pushButtonEdit.setVisible(True)
-        self.ui.pushButtonDelete.setVisible(True)
+  # def _update_ui_state(self, loaded: bool) -> None:
+  #   """Update UI state based on whether a glossary is loaded."""
+  #   # Initially hide all buttons except Load and New Repository
+  #   self.ui.pushButtonShowList.setVisible(False)
+  #   self.ui.pushButtonWrite.setVisible(False)
+  #   self.ui.pushButtonNew.setVisible(False)
+  #   self.ui.pushButtonEdit.setVisible(False)
+  #   self.ui.pushButtonDelete.setVisible(False)
+  #   self.ui.pushButtonAccept.setVisible(False)
+  #   self.ui.pushButtonCancel.setVisible(False)
+  #   self.ui.comboBoxHash.setVisible(False)
+  #
+  #   # Always show these buttons
+  #   self.ui.pushButtonLoad.setVisible(True)
+  #   self.ui.pushButtonNewRepo.setVisible(True)
+  #
+  #   # If a glossary is loaded, show the appropriate buttons
+  #   if loaded:
+  #     self.ui.pushButtonShowList.setVisible(True)
+  #     self.ui.pushButtonNew.setVisible(True)
+  #     self.ui.comboBoxHash.setVisible(True)
+  #
+  #     # Show edit/delete buttons if an entry is selected
+  #     if hasattr(self, '_original_hash') or self.ui.comboBoxHash.currentIndex() >= 0:
+  #       self.ui.pushButtonEdit.setVisible(True)
+  #       self.ui.pushButtonDelete.setVisible(True)
