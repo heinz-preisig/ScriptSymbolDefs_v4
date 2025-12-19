@@ -157,17 +157,17 @@ class UI(QtWidgets.QWidget):
               "nomenclature.tex": r"""% Nomenclature entries
 % Format: \nomenclature[<prefix>]{<symbol>}{<description>}
 % Example:
-% \nomenclature[A]{$A$}{Area ($\mathrm{m}^2$)}
+\nomenclature[A]{$A$}{Area ($\mathrm{m}^2$)}
 """,
               "def_vars.tex"    : r"""% Variable definitions
 % Format: \defVar[<unit>]{<name>}{<symbol>}{<description>}
 % Example:
-% \defVar[m^2]{A}{A}{Area}
+\defVar[m^2]{A}{A}{Area}
 """,
               "macros.tex"      : r"""% Macro definitions
 % Format: \newcommand{\<name>}[<args>]{<definition>}
 % Example:
-% \newcommand{\R}{\mathbb{R}}
+\newcommand{\R}{\mathbb{R}}
 """
               }
 
