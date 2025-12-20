@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Optional
 
 from PyQt6 import QtCore
-from PyQt6 import QtWidgets
+from PyQt6 import QtWidgets, QtGui
 from PyQt6.QtWidgets import QFileDialog
 from PyQt6.QtWidgets import QMenu
 from PyQt6.QtWidgets import QMessageBox
@@ -13,7 +13,7 @@ from listview_impl import UI_ListView
 from models import GlossaryManager
 
 
-class UI_EntntiesControl():
+class UI_EntitiesControl():
   def __init__(self, uis):
     self.items = {"controlRepro"  : uis.groupBoxReproControl,
                   "recordContents": uis.groupBoxRecordContents,
@@ -48,29 +48,24 @@ class UI_EntntiesControl():
     if mode == "start":
       visible = ["controlRepro"]
       hide = ["recordContents", "recordControl"]
+
     elif mode == "select":
       visible = ["controlRepro", "recordControl",
-                 "edit", "new", "select"]
+                 "new", "select"]
       hide = ["recordContents",
               "newRepository",
-              "edit","delete","new", "accept", "cancel"]
+              "edit", "delete", "accept", "cancel"]
 
     elif mode == "edit":
       visible = ["controlRepro", "recordControl",
-                 "edit", "new", "delete"]
-      hide = ["newRepository", "accept", "cancel"]
+                 "select", "edit", "delete"]
+      hide = ["newRepository", "new", "accept", "cancel"]
 
     elif mode == "editRecord":
-      visible = ["recordControl","recordContents",
+      visible = ["recordControl", "recordContents",
                  "cancel", "accept"]
       hide = ["controlRepro",
               "select", "edit", "delete", "new"]
-
-    # elif mode == "cancel":
-    #   visible = ["recordControl",
-    #              "select"]
-    #   hide = ["controlRepro",  "recordContents",
-    #           "edit", "new", "delete", "accept", "cancel"]
 
     for i in visible:
       self.items[i].setVisible(True)
@@ -82,12 +77,6 @@ class UI_EntntiesControl():
     self.items["symbol"].setReadOnly(not mode)
     self.items["description"].setReadOnly(not mode)
     self.items["sortKey"].setReadOnly(not mode)
-    # self.items["latex"].setEnabled(mode)
-
-    # If switching to view mode, clear any selection
-    # if not mode:
-    #   self.items["latex"].setCurrentIndex(-1)
-
 
 
 class UI(QtWidgets.QWidget):
@@ -102,7 +91,6 @@ class UI(QtWidgets.QWidget):
   def _setup_ui(self) -> None:
     """Initialize UI components and connections."""
     self.setWindowTitle("Glossary Editor")
-    self._new_repository = False
 
     # Connect buttons
     self.ui.pushButtonNewRepo.clicked.connect(self._create_new_repository)
@@ -114,10 +102,13 @@ class UI(QtWidgets.QWidget):
     self.ui.pushButtonCancel.clicked.connect(self.on_cancel_macro_definition_clicked)
     self.ui.pushButtonAccept.clicked.connect(self.on_accept_macro_clicked)
 
-    # setup interface components
-    self._ui_entities = UI_EntntiesControl(self.ui)
-    self._ui_entities.control("start")
+    # Setup input validation for hash (LaTeX command name)
+    hash_validator = QtGui.QRegularExpressionValidator(QtCore.QRegularExpression('^[a-zA-Z][a-zA-Z0-9]*$'), self)
+    self.ui.lineEditHash.setValidator(hash_validator)
 
+    # setup interface components
+    self._ui_entities = UI_EntitiesControl(self.ui)
+    self._ui_entities.control("start")
 
   def _create_new_repository(self) -> None:
     """Create a new glossary repository with empty files."""
@@ -183,7 +174,6 @@ class UI(QtWidgets.QWidget):
               "Success",
               f"New glossary repository created at {dir_path}"
               )
-      self._new_repository = True
       self._ui_entities.control("select")
 
     except Exception as e:
@@ -192,7 +182,6 @@ class UI(QtWidgets.QWidget):
               "Error",
               f"Failed to create glossary: {str(e)}"
               )
-      self._new_repository = False
 
   def on_load_clicked(self, dir_path: Optional[str] = None) -> None:
     """Handle load button click.
@@ -265,11 +254,9 @@ class UI(QtWidgets.QWidget):
 
   def on_new_macro_clicked(self) -> None:
     """Handle new entry button click."""
-
-    if not self._new_repository:
-      if not self.glossary:
-        QMessageBox.warning(self, "Error", "No glossary is loaded.")
-        return
+    if not self.glossary:
+      QMessageBox.warning(self, "Error", "No glossary is loaded.")
+      return
 
     # Clear the form and prepare for new entry
     self._clear_form()
@@ -278,27 +265,32 @@ class UI(QtWidgets.QWidget):
     default_sort_key = QtCore.QDateTime.currentDateTime().toString("yyyyMMddhhmmss")
     self.ui.lineEditSortKey.setText(default_sort_key)
 
-    # Set to edit mode
-    self._ui_entities.control("edit")
-    self._ui_entities.formEditMode(False)
-    self.ui.lineEditHash.setFocus()
-
-    # Store empty original hash to indicate new entry
+    # Store empty hash to indicate new entry and save initial form state
     self._original_hash = ""
+    self._original_form_state = self._save_form_state()
+    if hasattr(self, '_cancel_pressed'):
+      delattr(self, '_cancel_pressed')
+
+    # Set to edit mode
+    self._ui_entities.control("editRecord")
+    self._ui_entities.formEditMode(True)
+    self.ui.lineEditHash.setFocus()
 
   def on_edit_macro_clicked(self) -> None:
     """Handle edit button click for the current entry."""
     if not self.glossary:
       return
 
-    hash_name = self.ui.lineEditHash.text()
-    if not hash_name:
+    hash_name = self.ui.lineEditHash.text().strip()
+    if not hash_name or hash_name not in self.glossary.entries:
+      QMessageBox.warning(self, "Error", "No valid entry selected to edit.")
       return
 
-    # Store the original hash in case it gets changed
+    # Store the original hash and form state for potential restoration
     self._original_hash = hash_name
-
-    # Switch to edit mode
+    self._original_form_state = self._save_form_state()
+    if hasattr(self, '_cancel_pressed'):
+      delattr(self, '_cancel_pressed')
     self._ui_entities.control("editRecord")
     self._ui_entities.formEditMode(True)
 
@@ -346,13 +338,10 @@ class UI(QtWidgets.QWidget):
           if self._original_hash in self.glossary.entries:
             del self.glossary.entries[self._original_hash]
 
-        # Save to disk
-        if self.glossary.save():  # note all changes are updating the file
-          # Refresh the UI
-          self._populate_ui(hash_name)
-
+        # Save to disk - this updates all related files (nomenclature.tex, def_vars.tex, macros.tex)
+        if self.glossary.save():
           # Switch back to view mode
-          self._ui_entities.control("load")
+          self._ui_entities.control("select")
           self._ui_entities.formEditMode(False)
           QMessageBox.information(self, "Success", "Entry saved successfully.")
         else:
@@ -400,26 +389,69 @@ class UI(QtWidgets.QWidget):
     self._ui_entities.formEditMode(False)
     if hasattr(self, '_original_hash'):
       delattr(self, '_original_hash')
+    if hasattr(self, '_original_form_state'):
+      delattr(self, '_original_form_state')
+    if hasattr(self, '_cancel_pressed'):
+      delattr(self, '_cancel_pressed')
+
+  def _save_form_state(self) -> dict:
+    """Save the current form state for potential restoration."""
+    return {
+        'hash': self.ui.lineEditHash.text(),
+        'symbol': self.ui.lineEditSymbol.text(),
+        'description': self.ui.lineEditDescription.text(),
+        'sort_key': self.ui.lineEditSortKey.text()
+    }
+
+  def _restore_form_state(self, state: dict) -> None:
+    """Restore form state from saved state."""
+    self.ui.lineEditHash.setText(state['hash'])
+    self.ui.lineEditSymbol.setText(state['symbol'])
+    self.ui.lineEditDescription.setText(state['description'])
+    self.ui.lineEditSortKey.setText(state['sort_key'])
+
+  def _has_form_changed(self) -> bool:
+    """Check if the form has been modified from its original state."""
+    if not hasattr(self, '_original_form_state'):
+      return True  # No original state means it's a new entry
+    
+    current_state = self._save_form_state()
+    return any(
+        current_state[key] != self._original_form_state[key]
+        for key in ['hash', 'symbol', 'description', 'sort_key']
+    )
 
   def on_cancel_macro_definition_clicked(self) -> None:
-    """Handle cancel button click to exit edit mode and clear or restore form."""
-    if hasattr(self, '_original_hash'):
-      # If we were creating a new entry, clear the form
-      if not self._original_hash:
-        self._clear_form()
-      # If we were editing an existing entry, restore its values
-      elif self._original_hash in self.glossary.entries:
-        entry = self.glossary.entries[self._original_hash]
-        self.ui.lineEditHash.setText(self._original_hash)
-        self.ui.lineEditSymbol.setText(entry['symbol'])
-        self.ui.lineEditDescription.setText(entry['description'])
-        self.ui.lineEditSortKey.setText(entry['sort_key'])
-        self._ui_entities.formEditMode(False)
-        delattr(self, '_original_hash')
-    else:
+    """Handle cancel button click to exit edit mode.
+    
+    If no changes were made, exits immediately.
+    If changes were made, shows a confirmation dialog before discarding.
+    """
+    if not hasattr(self, '_original_hash'):
+      # Not in edit mode, just return to select state
+      self._ui_entities.control("select")
+      return
+    
+    # Check if there are any changes
+    if not self._has_form_changed():
+      # No changes made - just exit edit mode
       self._clear_form()
-
-    self._ui_entities.control("cancel")
+      self._ui_entities.control("select")
+      return
+      
+    # Changes detected - ask for confirmation
+    reply = QMessageBox.question(
+        self,
+        'Discard Changes?',
+        'You have unsaved changes. Are you sure you want to discard them?',
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        QMessageBox.StandardButton.No
+    )
+    
+    if reply == QMessageBox.StandardButton.Yes:
+      # User confirmed - discard changes and exit
+      self._clear_form()
+      self._ui_entities.control("select")
 
   def _browse_for_directory(self) -> None:
     """Show file dialog to select a directory."""
@@ -459,8 +491,8 @@ class UI(QtWidgets.QWidget):
     """
     if not self.glossary:
       return
-      
-    if macro_name  in self.glossary.entries:
+
+    if macro_name in self.glossary.entries:
       # Populate form with the specified macro's data
       macro_data = self.glossary.entries[macro_name]
       self.ui.lineEditHash.setText(macro_name)
@@ -475,30 +507,3 @@ class UI(QtWidgets.QWidget):
       self.ui.lineEditSymbol.setText(macro_data.get('symbol', ''))
       self.ui.lineEditDescription.setText(macro_data.get('description', ''))
       self.ui.lineEditSortKey.setText(macro_data.get('sort_key', ''))
-
-  # def _update_ui_state(self, loaded: bool) -> None:
-  #   """Update UI state based on whether a glossary is loaded."""
-  #   # Initially hide all buttons except Load and New Repository
-  #   self.ui.pushButtonShowList.setVisible(False)
-  #   self.ui.pushButtonWrite.setVisible(False)
-  #   self.ui.pushButtonNew.setVisible(False)
-  #   self.ui.pushButtonEdit.setVisible(False)
-  #   self.ui.pushButtonDelete.setVisible(False)
-  #   self.ui.pushButtonAccept.setVisible(False)
-  #   self.ui.pushButtonCancel.setVisible(False)
-  #   self.ui.comboBoxHash.setVisible(False)
-  #
-  #   # Always show these buttons
-  #   self.ui.pushButtonLoad.setVisible(True)
-  #   self.ui.pushButtonNewRepo.setVisible(True)
-  #
-  #   # If a glossary is loaded, show the appropriate buttons
-  #   if loaded:
-  #     self.ui.pushButtonShowList.setVisible(True)
-  #     self.ui.pushButtonNew.setVisible(True)
-  #     self.ui.comboBoxHash.setVisible(True)
-  #
-  #     # Show edit/delete buttons if an entry is selected
-  #     if hasattr(self, '_original_hash') or self.ui.comboBoxHash.currentIndex() >= 0:
-  #       self.ui.pushButtonEdit.setVisible(True)
-  #       self.ui.pushButtonDelete.setVisible(True)
