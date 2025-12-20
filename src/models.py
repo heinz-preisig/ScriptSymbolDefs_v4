@@ -28,7 +28,7 @@ class GlossaryManager:
   def _setup_file_paths(self) -> GlossaryFiles:
     return GlossaryFiles(
             nomenclature=self.base_dir / 'nomenclature.tex',
-            def_vars=self.base_dir / 'defvars.tex',
+            def_vars=self.base_dir / 'def_vars.tex',
             macros=self.base_dir / 'macros.tex',
             log=self.base_dir / 'nomenclature.log'
             )

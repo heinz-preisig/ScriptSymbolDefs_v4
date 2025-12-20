@@ -37,6 +37,12 @@
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
       <widget class="QPushButton" name="pushButtonLoad">
+       <property name="maximumSize">
+        <size>
+         <width>120</width>
+         <height>16777215</height>
+        </size>
+       </property>
        <property name="text">
         <string>load</string>
        </property>
@@ -44,6 +50,12 @@
      </item>
      <item>
       <widget class="QPushButton" name="pushButtonNewRepo">
+       <property name="maximumSize">
+        <size>
+         <width>120</width>
+         <height>16777215</height>
+        </size>
+       </property>
        <property name="text">
         <string>new</string>
        </property>
@@ -87,15 +99,14 @@
      </rect>
     </property>
     <layout class="QGridLayout" name="gridLayout">
-     <item row="1" column="4">
-      <widget class="QPushButton" name="pushButtonDelete">
-       <property name="text">
-        <string>delete</string>
-       </property>
-      </widget>
-     </item>
      <item row="2" column="1">
       <widget class="QPushButton" name="pushButtonAccept">
+       <property name="maximumSize">
+        <size>
+         <width>120</width>
+         <height>16777215</height>
+        </size>
+       </property>
        <property name="text">
         <string>accept</string>
        </property>
@@ -103,20 +114,25 @@
      </item>
      <item row="1" column="1">
       <widget class="QPushButton" name="pushButtonEdit">
+       <property name="maximumSize">
+        <size>
+         <width>120</width>
+         <height>16777215</height>
+        </size>
+       </property>
        <property name="text">
         <string>edit</string>
        </property>
       </widget>
      </item>
-     <item row="1" column="2">
-      <widget class="QPushButton" name="pushButtonNew">
-       <property name="text">
-        <string>new</string>
-       </property>
-      </widget>
-     </item>
      <item row="0" column="1">
       <widget class="QPushButton" name="pushButtonShowList">
+       <property name="maximumSize">
+        <size>
+         <width>120</width>
+         <height>16777215</height>
+        </size>
+       </property>
        <property name="text">
         <string>select</string>
        </property>
@@ -124,8 +140,40 @@
      </item>
      <item row="2" column="2">
       <widget class="QPushButton" name="pushButtonCancel">
+       <property name="maximumSize">
+        <size>
+         <width>120</width>
+         <height>16777215</height>
+        </size>
+       </property>
        <property name="text">
         <string>cancel</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="2">
+      <widget class="QPushButton" name="pushButtonNew">
+       <property name="maximumSize">
+        <size>
+         <width>120</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>new</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="2">
+      <widget class="QPushButton" name="pushButtonDelete">
+       <property name="maximumSize">
+        <size>
+         <width>120</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>delete</string>
        </property>
       </widget>
      </item>
@@ -154,14 +202,14 @@
      </rect>
     </property>
     <layout class="QFormLayout" name="formLayout">
-     <item row="1" column="0">
+     <item row="0" column="0">
       <widget class="QLabel" name="labelHash_2">
        <property name="text">
         <string>unique hash = latex name</string>
        </property>
       </widget>
      </item>
-     <item row="1" column="1">
+     <item row="0" column="1">
       <widget class="QLineEdit" name="lineEditHash">
        <property name="minimumSize">
         <size>
@@ -171,14 +219,14 @@
        </property>
       </widget>
      </item>
-     <item row="2" column="0">
+     <item row="1" column="0">
       <widget class="QLabel" name="labelSymbol_2">
        <property name="text">
         <string>math symbol in latex</string>
        </property>
       </widget>
      </item>
-     <item row="2" column="1">
+     <item row="1" column="1">
       <widget class="QLineEdit" name="lineEditSymbol">
        <property name="minimumSize">
         <size>
@@ -188,14 +236,14 @@
        </property>
       </widget>
      </item>
-     <item row="3" column="0">
+     <item row="2" column="0">
       <widget class="QLabel" name="labelSortKey_2">
        <property name="text">
         <string>sort key                                  </string>
        </property>
       </widget>
      </item>
-     <item row="3" column="1">
+     <item row="2" column="1">
       <widget class="QLineEdit" name="lineEditSortKey">
        <property name="minimumSize">
         <size>
@@ -205,32 +253,15 @@
        </property>
       </widget>
      </item>
-     <item row="4" column="0">
+     <item row="3" column="0">
       <widget class="QLabel" name="labelDescription_2">
        <property name="text">
         <string>description</string>
        </property>
       </widget>
      </item>
-     <item row="4" column="1">
+     <item row="3" column="1">
       <widget class="QLineEdit" name="lineEditDescription">
-       <property name="minimumSize">
-        <size>
-         <width>0</width>
-         <height>30</height>
-        </size>
-       </property>
-      </widget>
-     </item>
-     <item row="0" column="0">
-      <widget class="QLabel" name="label">
-       <property name="text">
-        <string>latex hash</string>
-       </property>
-      </widget>
-     </item>
-     <item row="0" column="1">
-      <widget class="QComboBox" name="comboBoxHash">
        <property name="minimumSize">
         <size>
          <width>0</width>
