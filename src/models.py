@@ -27,9 +27,9 @@ class GlossaryManager:
 
   def _setup_file_paths(self) -> GlossaryFiles:
     return GlossaryFiles(
-            nomenclature=self.base_dir / 'nomenclature.def',
-            def_vars=self.base_dir / 'defvars.def',
-            macros=self.base_dir / 'macros.def',
+            nomenclature=self.base_dir / 'nomenclature.tex',
+            def_vars=self.base_dir / 'defvars.tex',
+            macros=self.base_dir / 'macros.tex',
             log=self.base_dir / 'nomenclature.log'
             )
 
@@ -51,7 +51,7 @@ class GlossaryManager:
     
     missing_files = [name for name, path in required_files.items() if not path.exists()]
     if missing_files:
-        missing_str = ", ".join(f"{name}.def" for name in missing_files)
+        missing_str = ", ".join(f"{name}.tex" for name in missing_files)
         self.logger.warning("Missing required files: %s", missing_str)
         return False
 

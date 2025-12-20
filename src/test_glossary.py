@@ -10,7 +10,7 @@ def test_glossary_loading():
 \NomenclaturEntry{test2}{P}{Pressure}{P}"""
 
     # Write test file
-    test_file = Path(tmpdir) / 'nomenclature.def'
+    test_file = Path(tmpdir) / 'nomenclature.tex'
     test_file.write_text(test_data)
 
     # Test loading
@@ -22,5 +22,5 @@ def test_glossary_loading():
 
     # Test saving
     assert manager.save()
-    assert (Path(tmpdir) / 'defvars.def').exists()
-    assert (Path(tmpdir) / 'macros.def').exists()
+    assert (Path(tmpdir) / 'defvars.tex').exists()
+    assert (Path(tmpdir) / 'macros.tex').exists()

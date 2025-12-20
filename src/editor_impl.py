@@ -49,35 +49,29 @@ class UI_EntntiesControl():
     if mode == "start":
       visible = ["controlRepro"]
       hide = ["recordContents", "recordControl"]
-    elif mode == "newRepository":
-      visible = ["controlRepro"]
-      hide = ["load", "newRepository", "recordContents", "recordControl"]
-    elif mode == "load":
-      visible = ["controlRepro", "recordControl"]
-      hide = ["newRepository", "recordContents",
-              "edit", "new", "delete", "accept", "cancel"]
+    elif mode == "select":
+      visible = ["controlRepro", "recordControl", ,
+                 "edit", "new", "select"]
+      hide = ["recordContents",
+              "newRepository",
+              "edit","delete","new", "accept", "cancel"]
 
     elif mode == "edit":
-      visible = ["controlRepro", "recordControl", "recordContents",
-                 "edit", "new", "select"]
-      hide = ["newRepository", "accept", "cancel"]
-
-    elif mode == "firstRecord":
-      visible = ["controlRepro", "recordControl", "recordContents",
-                 "edit", "new"]
+      visible = ["controlRepro", "recordControl",
+                 "edit", "new", "delete"]
       hide = ["newRepository", "accept", "cancel"]
 
     elif mode == "editRecord":
-      visible = ["recordControl", "recordContents",
+      visible = ["recordControl","recordContents",
                  "cancel", "accept"]
       hide = ["controlRepro",
               "select", "edit", "delete", "new"]
 
-    elif mode == "cancel":
-      visible = ["recordControl",
-                 "select"]
-      hide = ["controlRepro",  "recordContents",
-              "edit", "new", "delete", "accept", "cancel"]
+    # elif mode == "cancel":
+    #   visible = ["recordControl",
+    #              "select"]
+    #   hide = ["controlRepro",  "recordContents",
+    #           "edit", "new", "delete", "accept", "cancel"]
 
     for i in visible:
       self.items[i].setVisible(True)
@@ -167,7 +161,7 @@ class UI(QtWidgets.QWidget):
               "macros.tex"      : r"""% Macro definitions
 % Format: \newcommand{\<name>}[<args>]{<definition>}
 % Example:
-\newcommand{\R}{\mathbb{R}}
+\newcommand{\A}{\Var{A}}
 """
               }
 
@@ -188,7 +182,7 @@ class UI(QtWidgets.QWidget):
               f"New glossary repository created at {dir_path}"
               )
       self._new_repository = True
-      self._control_ui("edit")
+      self._control_ui("select")
 
     except Exception as e:
       QMessageBox.critical(
@@ -207,6 +201,7 @@ class UI(QtWidgets.QWidget):
     if dir_path:
       # Directory was provided (from recent directories)
       self._load_glossary(dir_path)
+      self._control_ui("select")
       return
 
     # Show recent directories in a menu
@@ -265,6 +260,8 @@ class UI(QtWidgets.QWidget):
     if index >= 0:
       self.ui.comboBoxHash.setCurrentIndex(index)
     self.list_view.close()
+    self._control_ui("edit")
+    self._set_edit_mode(False)
 
   def on_new_macro_clicked(self) -> None:
     """Handle new entry button click."""
@@ -511,6 +508,7 @@ class UI(QtWidgets.QWidget):
 
     if dir_path:  # User didn't cancel
       self._load_glossary(dir_path)
+      self._control_ui("select")
 
   def _load_glossary(self, dir_path: str) -> None:
     """Load glossary from the specified directory."""
