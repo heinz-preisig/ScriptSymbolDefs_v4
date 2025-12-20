@@ -3,9 +3,11 @@ from typing import Optional
 
 from PyQt6 import QtCore
 from PyQt6 import QtWidgets, QtGui
+from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import QFileDialog
 from PyQt6.QtWidgets import QMenu
 from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtWidgets import QToolTip
 
 from directory_history import DirectoryHistory
 from editor import Ui_Form
@@ -251,6 +253,20 @@ class UI(QtWidgets.QWidget):
     self.list_view.close()
     self._ui_entities.control("edit")
     self._ui_entities.formEditMode(False)
+    
+    # Copy LaTeX command to clipboard
+    if macro_name in self.glossary.entries:
+      macro_data = self.glossary.entries[macro_name]
+      latex_cmd = "{" + f"\\{macro_name}" + "}" #{{{macro_data.get('description', '')}}}"
+      clipboard = QApplication.clipboard()
+      clipboard.setText(latex_cmd)
+      
+      # Optional: Show a brief tooltip notification
+      QToolTip.showText(
+          self.mapToGlobal(self.rect().center()),
+          f"Copied to clipboard: {latex_cmd}",
+          msecShowTime=2000  # Show for 2 seconds
+      )
 
   def on_new_macro_clicked(self) -> None:
     """Handle new entry button click."""
