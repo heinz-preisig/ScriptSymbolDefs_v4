@@ -93,6 +93,54 @@ class UI(QtWidgets.QWidget):
   def _setup_ui(self) -> None:
     """Initialize UI components and connections."""
     self.setWindowTitle("Glossary Editor")
+    
+    # Apply a modern style
+    self.setStyleSheet("""
+        QWidget {
+            font-family: Arial, sans-serif;
+            font-size: 10pt;
+            color: #000000;
+        }
+        QGroupBox {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-top: 10px;
+            padding-top: 15px;
+        }
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            left: 10px;
+            padding: 0 5px;
+            color: #000000;
+            font-weight: bold;
+        }
+        QPushButton {
+            background-color: #f0f0f0;
+            border: 1px solid #aaa;
+            border-radius: 3px;
+            padding: 5px 10px;
+            min-width: 80px;
+            color: #000000;
+        }
+        QPushButton:hover {
+            background-color: #e0e0e0;
+        }
+        QPushButton:pressed {
+            background-color: #d0d0d0;
+        }
+        QLineEdit, QTextEdit, QComboBox {
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            padding: 5px;
+            min-height: 20px;
+            color: #000000;
+            background-color: #ffffff;
+        }
+        QLabel {
+            color: #000000;
+            font-weight: 500;
+        }
+    """)
 
     # Connect buttons
     self.ui.pushButtonNewRepo.clicked.connect(self._create_new_repository)
@@ -492,6 +540,7 @@ class UI(QtWidgets.QWidget):
       self.glossary.load()
       self._last_glossary_dir = dir_path  # Store the directory for future use
       self.dir_history.add_directory(dir_path)  # Add this line to save to history
+      self.ui.labelDirectory.setText(dir_path)  # Update the directory label
       self._ui_entities.control("load")
 
     except Exception as e:
