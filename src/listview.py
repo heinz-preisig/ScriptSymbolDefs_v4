@@ -12,7 +12,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 class Ui_Dialog(object):
     def setupUi(self, Dialog):
         Dialog.setObjectName("Dialog")
-        Dialog.resize(348, 604)
+        Dialog.resize(348, 761)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -21,12 +21,24 @@ class Ui_Dialog(object):
         Dialog.setToolTip("")
         Dialog.setWhatsThis("")
         self.listMacros = QtWidgets.QListWidget(parent=Dialog)
-        self.listMacros.setGeometry(QtCore.QRect(10, 10, 321, 571))
+        self.listMacros.setGeometry(QtCore.QRect(10, 130, 321, 621))
         self.listMacros.setMaximumSize(QtCore.QSize(2000, 2000))
         self.listMacros.setSizeIncrement(QtCore.QSize(200, 200))
         self.listMacros.setToolTip("")
         self.listMacros.setWhatsThis("")
         self.listMacros.setObjectName("listMacros")
+        self.horizontalLayoutWidget = QtWidgets.QWidget(parent=Dialog)
+        self.horizontalLayoutWidget.setGeometry(QtCore.QRect(10, 30, 321, 80))
+        self.horizontalLayoutWidget.setObjectName("horizontalLayoutWidget")
+        self.horizontalLayout = QtWidgets.QHBoxLayout(self.horizontalLayoutWidget)
+        self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
+        self.horizontalLayout.setObjectName("horizontalLayout")
+        self.label = QtWidgets.QLabel(parent=self.horizontalLayoutWidget)
+        self.label.setObjectName("label")
+        self.horizontalLayout.addWidget(self.label)
+        self.lineEdit = QtWidgets.QLineEdit(parent=self.horizontalLayoutWidget)
+        self.lineEdit.setObjectName("lineEdit")
+        self.horizontalLayout.addWidget(self.lineEdit)
 
         self.retranslateUi(Dialog)
         QtCore.QMetaObject.connectSlotsByName(Dialog)
@@ -34,3 +46,4 @@ class Ui_Dialog(object):
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
         Dialog.setWindowTitle(_translate("Dialog", "Macro list"))
+        self.label.setText(_translate("Dialog", "search"))

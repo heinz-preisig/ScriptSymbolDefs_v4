@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>348</width>
-    <height>604</height>
+    <height>761</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -29,9 +29,9 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>10</y>
+     <y>130</y>
      <width>321</width>
-     <height>571</height>
+     <height>621</height>
     </rect>
    </property>
    <property name="maximumSize">
@@ -52,6 +52,28 @@
    <property name="whatsThis">
     <string comment="click on item to copy macro into the clipboard" extracomment="click on item to copy macro into the clipboard"/>
    </property>
+  </widget>
+  <widget class="QWidget" name="horizontalLayoutWidget">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>30</y>
+     <width>321</width>
+     <height>80</height>
+    </rect>
+   </property>
+   <layout class="QHBoxLayout" name="horizontalLayout">
+    <item>
+     <widget class="QLabel" name="label">
+      <property name="text">
+       <string>search</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLineEdit" name="lineEdit"/>
+    </item>
+   </layout>
   </widget>
  </widget>
  <resources/>
