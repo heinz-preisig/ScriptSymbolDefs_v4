@@ -340,6 +340,9 @@ class UI(QtWidgets.QWidget):
     self._ui_entities.formEditMode(True)
     self.ui.lineEditHash.setFocus()
 
+    # Clear the form and prepare for new entry
+    self._clear_form()
+
   def on_edit_macro_clicked(self) -> None:
     """Handle edit button click for the current entry."""
     if not self.glossary:
