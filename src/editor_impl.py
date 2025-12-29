@@ -65,9 +65,9 @@ class UI_EntitiesControl():
 
     elif mode == "editRecord":
       visible = ["recordControl", "recordContents",
-                 "cancel", "accept"]
+                 "cancel", "accept","new"]
       hide = ["controlRepro",
-              "select", "edit", "delete", "new"]
+              "select", "edit", "delete"]
 
     for i in visible:
       self.items[i].setVisible(True)
