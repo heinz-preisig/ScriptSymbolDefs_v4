@@ -60,8 +60,8 @@ class UI_EntitiesControl():
 
     elif mode == "edit":
       visible = ["controlRepro", "recordControl", "recordContents",
-                 "select", "edit", "delete"]
-      hide = ["newRepository", "new", "accept", "cancel"]
+                 "select", "edit", "delete", "new"]
+      hide = ["newRepository", "accept", "cancel"]
 
     elif mode == "editRecord":
       visible = ["recordControl", "recordContents",
